@@ -1,5 +1,4 @@
 import streamlit as st
-import hashlib
 from io import BytesIO
 from PIL import Image
 import requests
