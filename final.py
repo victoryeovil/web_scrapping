@@ -1,35 +1,52 @@
-import hashlib, io, requests, pandas as pd
+import streamlit as st
+import hashlib
+from io import BytesIO
+from PIL import Image
+import requests
+from bs4 import BeautifulSoup
 from selenium import webdriver
 from selenium.webdriver import ChromeOptions
-from bs4 import BeautifulSoup
-from pathlib import Path
-from PIL import Image
 
 
-options = ChromeOptions()
-options.add_argument("--headless=new")
-driver = webdriver.Chrome(options=options)
+def get_images(url):
+  options = ChromeOptions()
+  options.add_argument("--headless=new")
+  driver = webdriver.Chrome(options=options)
+  driver.get(url)
+  content = driver.page_source
+  soup = BeautifulSoup(content, "html.parser")
+  driver.quit()
 
-driver.get("https://www.ebay.com/sch/i.html?_from=R40&_trksid=p2334524.m570.l1313&_nkw=laptop&_sacat=0&LH_TitleDesc=0&_osacat=0&_odkw=laptop")
-results = []
-# driver.get("https://www.ebay.co.uk/b/bn_7116419481")
-content = driver.page_source
-soup = BeautifulSoup(content, "html.parser")
-driver.quit()
+  results = []
+  for a in soup.findAll(attrs={"class": "s-item__image-wrapper image-treatment"}):
+    image_url = a.find("img").get("src")
+    if image_url not in results:
+      results.append(image_url)
+  return results
 
-def gets_url(classes, location, source):
-    results = []
-    for a in soup.findAll(attrs={"class": classes}):
-        name = a.find(location)
-        if name not in results:
-            results.append(name.get(source))
-    return results
+
+def main():
+  st.title("eBay Image Scraper")
+  url = st.text_input("Enter eBay Listing URL")
+  if st.button("Scrape Images"):
+    if url:
+      st.write("Fetching images...")
+      images = get_images(url)
+      if images:
+        st.success(f"Found {len(images)} images!")
+        for image_url in images:
+          try:
+            image_content = requests.get(image_url).content
+            image_file = BytesIO(image_content)
+            image = Image.open(image_file).convert("RGB")
+            st.image(image)
+          except Exception as e:
+            st.error(f"Error downloading image: {e}")
+      else:
+        st.warning("No images found on the listing.")
+    else:
+      st.warning("Please enter a valid eBay listing URL.")
+
 
 if __name__ == "__main__":
-    returned_results = gets_url("s-item__image-wrapper image-treatment", "img", "src")
-    for b in returned_results:
-        image_content = requests.get(b).content
-        image_file = io.BytesIO(image_content)
-        image = Image.open(image_file).convert("RGB")
-        file_path = Path("C:\\Users\\angels.makuwerere\\Desktop\\webcrawler\\downloaded_images", hashlib.sha1(image_content).hexdigest()[:10] + ".png")
-        image.save(file_path, "PNG", quality=80)
+  main()
